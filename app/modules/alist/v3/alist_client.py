@@ -135,6 +135,8 @@ class AlistClient:
             )
 
         logger.debug(f"获取目录{dir_path_str}的文件列表成功")
+        if result["data"]["content"] is None:
+            return []
         try:
             return [
                 AlistPath(
