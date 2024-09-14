@@ -93,24 +93,40 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/trigger")
 async def trigger_job(request: Request):
     data = await request.json()
-    dst = data.get('dst')
-    if not dst:
-        reason = "请求体中缺少 'dst' 字段"
+    updates = data.get('Updates')
+    if not updates or not isinstance(updates, list):
+        reason = "'Updates' 不合法"
         logger.info(reason)
         return {"status": reason}, 400
     
-    # 找到匹配的服务器
-    matched_servers = [server for server in settings.AlistServerList if server["source_dir"] in dst]
-    if matched_servers:
-        for server in matched_servers:
+    unique_servers = {}
+    # 遍历 dst 中的每个元素，收集匹配的服务器，并按 'source_dir' 去重
+    for item in updates:
+        path_value = item.get('Path')
+        if not path_value:
+            logger.info(f'item 中缺少 "path" 字段，跳过此项')
+            continue
+        matched = False
+        for server in settings.AlistServerList:
+            if server["source_dir"] in path_value:
+                matched = True
+                logger.info(f'找到与 "{path_value}" 匹配的 Server {server["id"]}')
+                # 如果该 'source_dir' 尚未添加到 unique_servers，添加之
+                if server["source_dir"] not in unique_servers:
+                    unique_servers[server["source_dir"]] = server
+        if not matched:
+            unmatched_items.append(path_value)
+            logger.warn(f'未找到与 "{path_value}" 匹配的 Server')
+    
+    # 遍历去重后的服务器列表，执行任务
+    for server in unique_servers.values():
+        try:
             await queue_task(Alist2Strm(**server).run)
-            reason = f'任务 {server["id"]} 已成功触发'
-            logger.info(reason)
-        return {"status": reason}, 200
-    else:
-        reason = f'未找到对应的 Server ID'
-        logger.info(reason)
-        return {"status": reason}, 404
+            logger.info(f'任务 {server["id"]} 已成功触发')
+        except Exception as e:
+            logger.error(f'执行任务 {server["id"]} 时发生错误：{e}')
+
+    return {"status": "处理完成"}, 200
 
 if __name__ == "__main__":    
     print(LOGO + str(settings.APP_VERSION).center(65, "="))
