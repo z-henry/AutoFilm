@@ -317,6 +317,7 @@ class AlistClient:
         self,
         dir_path: str | None = None,
         filter: Callable[[AlistPath], bool] = lambda x: True,
+        mode: str = "AlistURL"
     ) -> AsyncGenerator[AlistPath, None]:
         """
         异步路径列表生成器
@@ -344,7 +345,11 @@ class AlistClient:
                     yield child_path
 
             if filter(path):
-                yield await self.async_api_fs_get(path)
+                
+                if mode == "AlistURL":
+                    yield path
+                else:
+                    yield await self.async_api_fs_get(path)
 
     def chdir(self, dir_path: str) -> None:
         """

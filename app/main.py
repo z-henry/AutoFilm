@@ -115,7 +115,6 @@ async def trigger_job(request: Request):
                 if server["source_dir"] not in unique_servers:
                     unique_servers[server["source_dir"]] = server
         if not matched:
-            unmatched_items.append(path_value)
             logger.warn(f'未找到与 "{path_value}" 匹配的 Server')
     
     # 遍历去重后的服务器列表，执行任务
@@ -129,7 +128,7 @@ async def trigger_job(request: Request):
     return {"status": "处理完成"}, 200
 
 if __name__ == "__main__":    
-    print(LOGO + str(settings.APP_VERSION).center(65, "="))
+    logger.info(LOGO + str(settings.APP_VERSION).center(65, "="))
     logger.info(f"AutoFilm {settings.APP_VERSION}启动中...")
     
      # 启动 FastAPI 应用

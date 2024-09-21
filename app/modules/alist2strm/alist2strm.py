@@ -111,19 +111,23 @@ class Alist2Strm:
             )
             self.mode = "AlistURL"
 
-        async with self.__max_workers:
-            async with ClientSession() as session:
-                self.session = session
-                async with TaskGroup() as tg:
-                    _create_task = tg.create_task
-                    async with AlistClient(
-                        self.url, self.username, self.password
-                    ) as client:
-                        async for path in client.iter_path(
-                            dir_path=self.source_dir, filter=filter
-                        ):
-                            _create_task(self.__file_processer(path))
-            logger.info("Alist2Strm处理完成")
+        logger.info("Alist2Strm开始处理")
+        try:
+            async with self.__max_workers:
+                async with ClientSession() as session:
+                    self.session = session
+                    async with TaskGroup() as tg:
+                        _create_task = tg.create_task
+                        async with AlistClient(
+                            self.url, self.username, self.password
+                        ) as client:
+                            async for path in client.iter_path(
+                                dir_path=self.source_dir, filter=filter
+                            ):
+                                _create_task(self.__file_processer(path))
+                logger.info("Alist2Strm处理完成")
+        except Exception as e:
+            logger.error(f"运行过程中发生错误: {str(e)}")
 
     @retry(Exception, tries=3, delay=3, backoff=2, logger=logger)
     async def __file_processer(self, path: AlistPath) -> None:
