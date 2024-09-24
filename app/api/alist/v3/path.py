@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-from app.utils import UrlUtils
+from re import sub
+
+from app.utils import URLUtils
 
 
 class AlistPath:
@@ -85,7 +87,14 @@ class AlistPath:
         else:
             url = self.server_url + "/d" + self.abs_path
 
-        return UrlUtils.encode(url)
+        return URLUtils.encode(url)
+
+    @property
+    def proxy_download_url(self):
+        """
+        Alist代理下载地址
+        """
+        return sub(r"/d/", "/p/", self.download_url, 1)
 
     @property
     def suffix(self):

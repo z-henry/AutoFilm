@@ -9,8 +9,8 @@ from aiohttp import ClientSession
 
 from app.core import logger
 from app.utils import retry
-from app.modules.alist.v3.alist_path import AlistPath
-from app.modules.alist.v3.alist_storage import AlistStorage
+from app.api.alist.v3.path import AlistPath
+from app.api.alist.v3.storage import AlistStorage
 
 
 class AlistClient:
@@ -27,7 +27,6 @@ class AlistClient:
         :param password: Alist 密码
         """
         self.__HEADERS = {
-            "User-Agent": "Apifox/1.0.0 (https://apifox.com)",
             "Content-Type": "application/json",
         }
 
@@ -47,21 +46,20 @@ class AlistClient:
         """
         data = dumps({"username": self.username, "password": self.__password})
         api_url = self.url + "/api/auth/login"
-        async with self.__session.post(api_url, data=data) as resp:
+        async with ClientSession(headers=self.__HEADERS) as session:
+            async with session.post(api_url, data=data) as resp:
 
-            if resp.status != 200:
-                raise RuntimeError(f"登录请求发送失败，状态码：{resp.status}")
+                if resp.status != 200:
+                    raise RuntimeError(f"登录请求发送失败，状态码：{resp.status}")
 
-            result = await resp.json()
+                result = await resp.json()
 
-        if result["code"] != 200:
-            raise RuntimeError(f'登录失败，错误信息：{result["message"]}')
+            if result["code"] != 200:
+                raise RuntimeError(f'登录失败，错误信息：{result["message"]}')
 
-        logger.debug(f"{self.username}登录成功")
-        self.__HEADERS.update({"Authorization": result["data"]["token"]})
+            logger.debug(f"{self.username}登录成功")
+            self.__HEADERS.update({"Authorization": result["data"]["token"]})
 
-        if self.__session:
-            await self.__session.close()
         self.__session = ClientSession(headers=self.__HEADERS)
 
     @retry(RuntimeError, tries=3, delay=3, backoff=1, logger=logger, ret=None)
@@ -316,6 +314,7 @@ class AlistClient:
     async def iter_path(
         self,
         dir_path: str | None = None,
+        is_detail: bool = True,
         filter: Callable[[AlistPath], bool] = lambda x: True,
         mode: str = "AlistURL"
     ) -> AsyncGenerator[AlistPath, None]:
@@ -324,6 +323,7 @@ class AlistClient:
         返回目录及其子目录的所有文件和目录的 AlistPath 对象
 
         :param dir_path: 目录路径（默认为 self.pwd）
+        :param is_detail：是否获取详细信息（raw_url）
         :param filter: 匿名函数过滤器（默认不启用）
         :return: AlistPath 对象生成器
         """
@@ -340,16 +340,15 @@ class AlistClient:
         for path in await self.async_api_fs_list(dir_path):
             if path.is_dir:
                 async for child_path in self.iter_path(
-                    dir_path=path.path, filter=filter
+                    dir_path=path.path, is_detail=is_detail, filter=filter
                 ):
                     yield child_path
 
             if filter(path):
-                
-                if mode == "AlistURL":
-                    yield path
-                else:
+                if is_detail:
                     yield await self.async_api_fs_get(path)
+                else:
+                    yield path
 
     def chdir(self, dir_path: str) -> None:
         """
@@ -370,7 +369,6 @@ class AlistClient:
         return self.__dir
 
     async def __aenter__(self):
-        self.__session = ClientSession(headers=self.__HEADERS)
         await self.async_api_auth_login()
         await self.async_api_me()
         return self

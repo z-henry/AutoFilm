@@ -11,7 +11,7 @@ from aiohttp import ClientSession
 from app.core import logger
 from app.utils import retry
 from app.extensions import VIDEO_EXTS, SUBTITLE_EXTS, IMAGE_EXTS, NFO_EXTS
-from app.modules.alist import AlistClient, AlistPath
+from app.api import AlistClient, AlistPath
 
 
 class Alist2Strm:
@@ -97,7 +97,7 @@ class Alist2Strm:
             if self.overwrite:
                 return True
 
-            local_path = self.get_local_path(path)
+            local_path = self.__get_local_path(path)
 
             if local_path.exists():
                 logger.debug(f"文件{local_path.name}已存在，跳过处理{path.path}")
@@ -111,6 +111,10 @@ class Alist2Strm:
             )
             self.mode = "AlistURL"
 
+        if self.mode == "RawURL":
+            is_detail = True
+        else:
+            is_detail = False
         logger.info("Alist2Strm开始处理")
         try:
             async with self.__max_workers:
@@ -122,7 +126,7 @@ class Alist2Strm:
                             self.url, self.username, self.password
                         ) as client:
                             async for path in client.iter_path(
-                                dir_path=self.source_dir, filter=filter
+                            	dir_path=self.source_dir, is_detail=is_detail, filter=filter
                             ):
                                 _create_task(self.__file_processer(path))
                 logger.info("Alist2Strm处理完成")
@@ -136,7 +140,7 @@ class Alist2Strm:
 
         :param path: AlistPath 对象
         """
-        local_path = self.get_local_path(path)
+        local_path = self.__get_local_path(path)
 
         if self.mode == "AlistURL":
             content = path.download_url
@@ -161,14 +165,14 @@ class Alist2Strm:
                 async with self.__max_downloaders:
                     async with async_open(local_path, mode="wb") as file:
                         _write = file.write
-                        async with self.session.get(content) as resp:
+                        async with self.session.get(path.download_url) as resp:
                             async for chunk in resp.content.iter_chunked(1024):
                                 await _write(chunk)
                     logger.info(f"{local_path.name}下载成功")
         except Exception as e:
             raise RuntimeError(f"{local_path}处理失败，详细信息：{e}")
 
-    def get_local_path(self, path: AlistPath) -> Path:
+    def __get_local_path(self, path: AlistPath) -> Path:
         """
         根据给定的 AlistPath 对象和当前的配置，计算出本地文件路径。
         """
