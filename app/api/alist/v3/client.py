@@ -141,7 +141,8 @@ class AlistClient:
                     server_url=self.url,
                     base_path=self.base_path,
                     path=dir_path_str + path["name"],
-                    **path,
+                    **{k: v for k, v in path.items() if k != "path"}
+                    #**path
                 )
                 for path in result["data"]["content"]
             ]
