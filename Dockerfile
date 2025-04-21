@@ -1,14 +1,9 @@
-FROM python:3.12.4-alpine
+FROM python:3.12-slim
+
+WORKDIR /app
 
 ENV TZ=Asia/Shanghai
-
-RUN apk update \
-    && apk upgrade \
-    && apk add bash \
-    && rm -rf \
-        /tep \
-        /var/lib/apt/lists \
-        /var/tmp
+VOLUME ["/config", "/logs", "/media"]
 
 COPY requirements.txt requirements.txt
 
@@ -18,5 +13,4 @@ RUN pip install --upgrade pip \
 
 COPY app /app
 
-VOLUME ["/config", "/logs", "/media"]
-CMD python /app/main.py
+ENTRYPOINT ["python", "/app/main.py"]
